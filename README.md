@@ -139,3 +139,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 - This project is mainly for me appling RA of Federated Reinforcement Learning for Mobile Edge Computing area
 - Special thanks to all contributors and researchers in the field
+- This readme file is write by AI(laugh)
