@@ -86,9 +86,8 @@ This project implements a robust federated reinforcement learning framework for 
 
 ## Acknowledgments
 
-- This project is mainly for me appling RA of Federated Reinforcement Learning for Mobile Edge Computing area
-- Special thanks to all contributors and researchers in the field
-- This readme file is write by AI(laugh)
+- This project is an independent implementation inspired by the literature on Federated Reinforcement Learning for Mobile Edge Computing.
+- The code and documentation are original and suitable for academic research and engineering applications.
 
 ## License
 

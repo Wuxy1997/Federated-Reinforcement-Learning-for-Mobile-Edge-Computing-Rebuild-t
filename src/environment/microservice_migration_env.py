@@ -52,6 +52,9 @@ class MicroserviceMigrationEnv(gym.Env):
         total_delay = self._calculate_dag_completion_time()
         migration_penalty = 0.1  # You can design a more complex penalty
         reward = -total_delay - migration_penalty
+        reward = reward + 10
+        reward = np.clip(reward, 0, 20)
+        reward = reward / 20  # Normalize to [0, 1]
 
         self.current_step += 1
         if self.current_step >= 20:

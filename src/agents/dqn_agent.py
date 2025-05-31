@@ -18,7 +18,7 @@ class DQN(nn.Module):
         return self.fc3(x)
 
 class DQNAgent:
-    def __init__(self, state_size, action_size, learning_rate=0.001, gamma=0.99,
+    def __init__(self, state_size, action_size, learning_rate=0.0001, gamma=0.95,
                  epsilon=1.0, epsilon_min=0.01, epsilon_decay=0.995, memory_size=10000,
                  batch_size=64):
         self.state_size = state_size
@@ -38,8 +38,9 @@ class DQNAgent:
         self.target_network = DQN(state_size, action_size).to(self.device)
         self.target_network.load_state_dict(self.q_network.state_dict())
         
-        self.optimizer = optim.Adam(self.q_network.parameters(), lr=learning_rate)
+        self.optimizer = optim.Adam(self.q_network.parameters(), lr=self.learning_rate)
         self.criterion = nn.MSELoss()
+        self.loss_history = []
     
     def remember(self, state, action, reward, next_state, done):
         """Store experience in replay memory"""
@@ -84,6 +85,7 @@ class DQNAgent:
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
+        self.loss_history.append(loss.item())
         
         # Update epsilon
         self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)

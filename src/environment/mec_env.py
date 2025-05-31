@@ -61,6 +61,9 @@ class MECEnvironment(gym.Env):
         
         # Calculate reward (negative of total cost)
         reward = -self._calculate_cost(execution_time, energy_consumption)
+        reward = reward + 10
+        reward = np.clip(reward, 0, 20)
+        reward = reward / 20  # Normalize to [0, 1]
         
         # Check if deadline is met
         done = execution_time > self.task_deadline[self.current_device]

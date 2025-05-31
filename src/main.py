@@ -4,6 +4,7 @@ import copy
 import random
 import gym # Import gym
 import matplotlib.pyplot as plt # Import matplotlib.pyplot
+import pandas as pd
 from environment.mec_env import MECEnvironment
 from agents.dqn_agent import DQNAgent
 from federated.federated_learning import FederatedLearning
@@ -126,9 +127,10 @@ def main():
     
     # Training history
     global_rewards = []
-    # Add other metrics to track if needed, e.g., total migrations per round
-    # total_migrations_per_round = []
-    
+    # Data collection for CSV export
+    global_rounds = []
+    client_rounds = []
+    service_migrations = []
     # Federated learning rounds
     for round in range(NUM_ROUNDS):
         print(f"\nFederated Learning Round {round + 1}/{NUM_ROUNDS}")
@@ -149,6 +151,7 @@ def main():
         client_sizes = [len(rewards) for rewards in client_rewards]
 
         # ==== Model poisoning attack simulation ====
+        adv_indices = []
         if ENABLE_ATTACK and NUM_ADV > 0:
             adv_indices = random.sample(range(len(client_weights)), NUM_ADV)
             for idx in adv_indices:
@@ -174,10 +177,71 @@ def main():
         
         # Record average reward for this round
         avg_reward = np.mean([np.mean(rewards) for rewards in client_rewards])
+        std_reward = np.std([np.mean(rewards) for rewards in client_rewards])
         global_rewards.append(avg_reward)
         print(f"Round {round + 1} Average Reward: {avg_reward:.2f}")
 
-        # total_migrations_per_round.append(np.sum(client_migration_counts)) # Example
+        # --- Data collection for global_rounds.csv ---
+        total_migrations_this_round = None
+        if USE_MIGRATION_ENV:
+            # Estimate total migrations (example: count changes in service locations)
+            # Here, just set to 0 as placeholder; you can implement actual logic if needed
+            total_migrations_this_round = 0
+        global_flag = ''
+        if avg_reward < -100:  # Example abnormal threshold
+            global_flag = 'ALERT'
+        global_rounds.append({
+            'round': round + 1,
+            'global_avg_reward': avg_reward,
+            'global_reward_std': std_reward,
+            'aggregation_method': AGGREGATION_METHOD,
+            'attack_method': ATTACK_METHOD,
+            'attack_epsilon': ATTACK_EPSILON,
+            'num_adv': NUM_ADV,
+            'total_migrations': total_migrations_this_round,
+            'flag': global_flag
+        })
+
+        # --- Data collection for client_rounds.csv ---
+        for i, rewards in enumerate(client_rewards):
+            client_avg = np.mean(rewards)
+            client_std = np.std(rewards)
+            if hasattr(agents[i], 'loss_history') and agents[i].loss_history:
+                client_loss = agents[i].loss_history[-1]
+            else:
+                client_loss = 'NA'
+            is_adv = i in adv_indices
+            client_flag = ''
+            if client_loss != 'NA' and client_loss > 500:
+                client_flag = 'ALERT'
+            elif client_avg < 0.05:
+                client_flag = 'ALERT'
+            client_rounds.append({
+                'round': round + 1,
+                'client_id': i,
+                'client_avg_reward': client_avg,
+                'client_reward_std': client_std,
+                'client_loss': client_loss,
+                'is_adversarial': is_adv,
+                'flag': client_flag
+            })
+
+        # --- Data collection for service_migration.csv ---
+        if USE_MIGRATION_ENV:
+            # For each service, record its location and migration count (placeholder: 0)
+            service_locs = env.service_locations if hasattr(env, 'service_locations') else [None]*NUM_SERVICES
+            for sid, node in enumerate(service_locs):
+                migration_count = 0  # TODO: implement actual migration count logic if available
+                service_flag = ''
+                if migration_count > 10:
+                    service_flag = 'ALERT'
+                service_migrations.append({
+                    'round': round + 1,
+                    'service_id': sid,
+                    'edge_node_id': node,
+                    'service_migrations': migration_count,
+                    'flag': service_flag
+                })
     
     # ==== Visualization and Data Export ====
 
@@ -304,6 +368,13 @@ def main():
     # Export Rewards to CSV
     export_rewards_to_csv(global_rewards, filename=os.path.join(OUTPUT_DIR, 'training_rewards.csv'))
     print(f"Training rewards exported to {os.path.join(OUTPUT_DIR, 'training_rewards.csv')}")
+
+    # Export tabular data to CSV
+    pd.DataFrame(global_rounds).to_csv(os.path.join(OUTPUT_DIR, 'global_rounds.csv'), index=False)
+    pd.DataFrame(client_rounds).to_csv(os.path.join(OUTPUT_DIR, 'client_rounds.csv'), index=False)
+    if USE_MIGRATION_ENV:
+        pd.DataFrame(service_migrations).to_csv(os.path.join(OUTPUT_DIR, 'service_migration.csv'), index=False)
+    print(f"Tabular data exported to {OUTPUT_DIR} (global_rounds.csv, client_rounds.csv, service_migration.csv)")
 
     # Plot Initial and Final DAG Service Locations (only if using migration env)
     if USE_MIGRATION_ENV:
