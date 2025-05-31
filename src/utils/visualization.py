@@ -27,36 +27,33 @@ def plot_reward_histogram(rewards, filename='reward_histogram.png'):
     plt.savefig(filename)
     plt.close()
 
-def plot_dag_with_locations(dag, service_locations, num_nodes, filename=None):
-    """Visualize the DAG structure and service locations on nodes."""
-    pos = nx.spring_layout(dag)
-    node_colors = [service_locations[n] for n in dag.nodes]
+def plot_dag_with_locations(dag, service_locations, num_nodes, filename='dag_locations.png'):
+    """Visualize DAG with service locations (node colors)."""
+    fig, ax = plt.subplots(figsize=(8, 6))
+    pos = nx.spring_layout(dag, seed=42)
     cmap = plt.get_cmap('tab10', num_nodes)
-    nx.draw(dag, pos, with_labels=True, node_color=node_colors, cmap=cmap, node_size=500)
-    sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=0, vmax=num_nodes-1))
-    plt.colorbar(sm, ticks=range(num_nodes), label='Edge Node ID')
-    if filename:
-        plt.savefig(filename)
-        plt.close()
-    else:
-        plt.show()
+    node_colors = [cmap(int(service_locations[i])) for i in range(len(service_locations))]
+    nx.draw_networkx_edges(dag, pos, ax=ax, arrows=True, arrowstyle='-|>', arrowsize=20)
+    nx.draw_networkx_nodes(dag, pos, node_color=node_colors, node_size=500, ax=ax)
+    nx.draw_networkx_labels(dag, pos, ax=ax)
+    norm = plt.Normalize(vmin=0, vmax=num_nodes-1)
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    fig.colorbar(sm, ax=ax, ticks=range(num_nodes), label='Edge Node ID')
+    plt.title('DAG Service Locations')
+    plt.tight_layout()
+    plt.savefig(filename)
+    plt.close()
 
-def save_migration_animation(dag, service_locs_history, num_nodes, gif_filename='migration_animation.gif'):
-    """Create a GIF animation of service migration over time."""
-    images = []
-    for step, service_locations in enumerate(service_locs_history):
-        fname = f'dag_step_{step}.png'
-        plot_dag_with_locations(dag, service_locations, num_nodes, filename=fname)
-        images.append(imageio.imread(fname))
-    imageio.mimsave(gif_filename, images, duration=0.5)
+def save_migration_animation(frames, filename='migration_animation.gif', duration=0.5):
+    imageio.mimsave(filename, frames, duration=duration)
 
 def export_rewards_to_csv(rewards, filename='rewards.csv'):
     """Export rewards to a CSV file."""
     pd.DataFrame({'reward': rewards}).to_csv(filename, index=False)
 
-def export_service_locations_history(service_locs_history, filename='service_locations_history.csv'):
-    """Export service locations history to a CSV file."""
-    pd.DataFrame(service_locs_history).to_csv(filename, index=False)
+def export_service_locations_history(history, filename='service_locations_history.csv'):
+    pd.DataFrame(history).to_csv(filename, index=False)
 
 def plot_multi_metrics(metrics_dict, filename='multi_metrics.png'):
     """Plot multiple metrics (e.g., reward, migration count) in subplots."""

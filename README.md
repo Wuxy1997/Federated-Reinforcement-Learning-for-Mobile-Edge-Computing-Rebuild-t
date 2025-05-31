@@ -1,4 +1,5 @@
 # Federated Reinforcement Learning for Mobile Edge Computing
+
 This project implements a robust federated reinforcement learning framework for mobile edge computing (MEC) environments, with a focus on microservice migration optimization.
 
 ## Project Structure
@@ -6,137 +7,89 @@ This project implements a robust federated reinforcement learning framework for 
 ```
 ├── src/
 │   ├── agents/                 # RL agent implementations
-│   │   ├── dqn_agent.py       # DQN agent implementation
-│   │   └── ddpg_agent.py      # DDPG agent implementation
-│   ├── environment/           # Environment implementations
-│   │   ├── mec_env.py         # Basic MEC environment
-│   │   └── microservice_migration_env.py  # Microservice migration environment
-│   ├── federated/             # Federated learning implementations
-│   │   ├── federated_learning.py          # Standard federated learning
-│   │   └── robust_federated_learning.py   # Robust federated learning
-│   ├── robust/               # Robust aggregation methods
-│   │   ├── krum.py           # Krum aggregation
-│   │   ├── median.py         # Median aggregation
-│   │   └── trimmed_mean.py   # Trimmed mean aggregation
-│   ├── utils/                # Utility functions
-│   │   ├── visualization.py  # Visualization tools
-│   │   └── metrics.py        # Performance metrics
-│   └── main.py              # Main training script
-├── requirements.txt         # Project dependencies
-└── README.md               # Project documentation
+│   ├── environment/            # Environment implementations
+│   ├── federated/              # Federated learning implementations
+│   ├── robust/                 # Robust aggregation methods
+│   ├── utils/                  # Utility functions
+│   ├── configs/                # Configuration files
+│   ├── experiments/            # Experiment scripts
+│   └── main.py                 # Main training script
+├── requirements.txt            # Project dependencies
+├── webapp.py                   # Web interface for visualization
+├── templates/                  # Web frontend templates
+├── static/results/             # Output directory for results
+├── FRL_code_explanation_en.md  # English code explanation
+└── README.md                   # Project documentation
 ```
 
 ## Features
 
-- **Robust Federated Learning**: Implements multiple robust aggregation methods:
-  - Krum
-  - Median
-  - Trimmed Mean
-- **Model Poisoning Defense**: Built-in defense against model poisoning attacks
-- **Multiple Environments**:
-  - Basic MEC environment
-  - Microservice migration environment with DAG support
-- **Visualization Tools**:
-  - Training progress visualization
-  - DAG structure visualization
-  - Migration animation
-  - Performance metrics plotting
+- **Robust Federated Learning**: Implements multiple robust aggregation methods (Krum, Median, Trimmed Mean) to defend against model poisoning attacks. These methods ensure that the global model remains resilient even when some clients are compromised.
+- **Multiple Environments**: Supports both a basic MEC environment and a microservice migration environment with DAG support, allowing for flexible experimentation and optimization.
+- **Model Poisoning Simulation**: Simulates attacks such as random noise and sign flip, enabling researchers to evaluate the robustness of the federated learning system under adversarial conditions.
+- **Automatic Visualization**: Generates comprehensive visualizations including training curves, reward distributions, client comparisons, service migration heatmaps, aggregation method comparisons, and attack impact analysis.
+- **Web Interface**: Provides a user-friendly web interface to configure parameters, run experiments, and browse/download results, making it accessible for both researchers and practitioners.
+
+## Principles
+
+- **Federated Learning**: The system employs federated learning to train models across multiple devices without sharing raw data, thus preserving privacy and reducing communication overhead.
+- **Reinforcement Learning**: Utilizes reinforcement learning algorithms to optimize decision-making processes in dynamic environments, such as task offloading and microservice migration.
+- **Robust Aggregation**: Implements robust aggregation techniques to mitigate the impact of adversarial attacks, ensuring the integrity and reliability of the global model.
+- **Visualization and Analysis**: Emphasizes the importance of visualization and analysis tools to interpret results and gain insights into the performance of the federated learning system.
 
 ## Installation
 
 1. Clone the repository:
-```bash
-git clone [repository-url]
-cd [repository-name]
-```
+   ```bash
+   git clone [repository-url]
+   cd [repository-name]
+   ```
 
 2. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-## Usage
+## Quick Start
 
-### Basic Training
+### Web Interface
 
-Run the main training script with default settings:
-```bash
-python src/main.py
-```
+1. Start the web server:
+   ```bash
+   python webapp.py
+   ```
 
-### Configuration
+2. Open your browser and navigate to [http://localhost:5000](http://localhost:5000).
 
-The main training parameters can be configured in `src/main.py`:
+3. Configure your experiment parameters on the web page, click "Run," and view the automatically generated visualizations and results. You can download images and CSV data directly from the interface.
 
-```python
-# Federated Learning Settings
-USE_ROBUST_FL = True  # Use robust federated learning
-AGGREGATION_METHOD = 'krum'  # Aggregation method
-NUM_ADV = 1  # Number of adversarial clients
+## Results and Visualization
 
-# Attack Settings
-ENABLE_ATTACK = True  # Enable model poisoning attack
-ATTACK_METHOD = 'random_noise'  # Attack method
-ATTACK_EPSILON = 10.0  # Attack strength
+- The training process automatically generates the following results (default in `static/results/`):
+  - `training_results.png`: Global average reward curve
+  - `training_rewards.csv`: Detailed reward data
+  - `client_rewards.png`: Client-wise reward comparison
+  - `reward_distribution.png`: Reward distribution histogram
+  - `aggregation_comparison.png`: Aggregation method comparison
+  - `attack_impact.png`: Attack impact analysis
+  - `client_evolution.png`: Client performance evolution
+  - Additional visualizations such as service migration heatmaps and DAG structure (if migration environment is enabled)
 
-# Environment Settings
-USE_MIGRATION_ENV = False  # Use microservice migration environment
-NUM_EDGE_NODES = 3
-NUM_MOBILE_DEVICES = 5
-NUM_SERVICES = 5
+## Testing and Extension
 
-# Training Settings
-EPISODES_PER_ROUND = 100
-NUM_ROUNDS = 10
-```
+- **Environment Testing**: Run `src/experiments/test_microservice_migration_env.py` to verify the microservice migration environment and DAG dependencies:
+  ```bash
+  python src/experiments/test_microservice_migration_env.py
+  ```
 
-### Visualization
-
-The training process generates several visualization files:
-- `training_results.png`: Global average reward curve
-- `training_rewards.csv`: Detailed reward data
-- `initial_dag_locations.png`: Initial DAG structure (when using migration environment)
-- `global_model.pth`: Trained global model
-
-## Robust Aggregation Methods
-
-### Krum
-- Selects the model update that is closest to its neighbors
-- Effective against Byzantine attacks
-- Parameters:
-  - `num_adv`: Number of adversarial clients to defend against
-
-### Median
-- Takes the median of all model updates for each parameter
-- Robust against outliers
-- No additional parameters required
-
-### Trimmed Mean
-- Removes a percentage of extreme values before averaging
-- Parameters:
-  - `trim_ratio`: Percentage of values to trim from each end
-
-## Model Poisoning Attacks
-
-The framework includes simulation of model poisoning attacks:
-- Random Noise: Adds random noise to model parameters
-- Sign Flip: Flips the signs of model parameters
-- Attack strength can be controlled via `ATTACK_EPSILON`
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+- For detailed code structure and extension suggestions, refer to `FRL_code_explanation_en.md`.
 
 ## Acknowledgments
 
 - This project is mainly for me appling RA of Federated Reinforcement Learning for Mobile Edge Computing area
 - Special thanks to all contributors and researchers in the field
 - This readme file is write by AI(laugh)
+
+## License
+
+MIT License, see LICENSE file for details.

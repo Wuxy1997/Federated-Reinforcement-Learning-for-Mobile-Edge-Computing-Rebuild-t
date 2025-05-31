@@ -11,28 +11,6 @@ from robust.robust_federated_learning import RobustFederatedLearning
 from utils.visualization import plot_multiple_rewards, plot_reward_histogram, plot_dag_with_locations, save_migration_animation, export_rewards_to_csv, export_service_locations_history, plot_multi_metrics
 from environment.microservice_migration_env import MicroserviceMigrationEnv # Import the migration environment
 
-# User configurable parameters
-USE_ROBUST_FL = True  # True: Use robust federated learning, False: Standard federated learning
-AGGREGATION_METHOD = 'krum'  # 'krum', 'median', 'trimmed_mean' (only effective for robust FL)
-NUM_ADV = 1  # Number of adversarial clients (only for krum)
-TRIM_RATIO = 0.1  # Trim ratio for trimmed mean (only for trimmed_mean)
-
-# ==== Model poisoning attack parameters ====
-ENABLE_ATTACK = True  # Whether to enable model poisoning attack
-ATTACK_METHOD = 'random_noise'  # 'random_noise', 'sign_flip', etc.
-ATTACK_EPSILON = 10.0  # Attack strength (e.g., noise magnitude)
-
-# ==== Environment Parameters ====
-USE_MIGRATION_ENV = False # True: Use MicroserviceMigrationEnv, False: Use MECEnvironment
-NUM_EDGE_NODES = 3
-NUM_MOBILE_DEVICES = 5 # Also number of clients in FL
-NUM_SERVICES = 5 # Number of microservices for migration env
-
-# ==== Training Parameters ====
-EPISODES_PER_ROUND = 100
-NUM_ROUNDS = 10
-
-
 def poison_model(state_dict, method='random_noise', epsilon=10.0):
     poisoned = copy.deepcopy(state_dict)
     for k in poisoned.keys():
@@ -54,14 +32,15 @@ def train_client(agent, env, episodes=100):
         
         while not done:
             action = agent.act(state)
-            # Ensure action is in correct format for MultiDiscrete if using migration env
             if isinstance(env.action_space, gym.spaces.MultiDiscrete):
-                 # Agent action is an index, need to map to (service_id, target_node_id)
-                 # This requires a proper mapping based on your agent's output layer
-                 # For now, let's assume the agent directly outputs the multi-discrete action tuple
-                 pass # Agent should output a tuple (service_id, target_node)
-            
-            next_state, reward, done, _ = env.step(action)
+                # Map flat action index to (service_id, target_node)
+                nvec = env.action_space.nvec
+                service_id = action // nvec[1]
+                target_node = action % nvec[1]
+                action_tuple = (service_id, target_node)
+                next_state, reward, done, _ = env.step(action_tuple)
+            else:
+                next_state, reward, done, _ = env.step(action)
             agent.remember(state, action, reward, next_state, done)
             agent.replay()
             state = next_state
@@ -75,6 +54,42 @@ def train_client(agent, env, episodes=100):
     return rewards_history
 
 def main():
+    import argparse
+    import os
+    parser = argparse.ArgumentParser(description='Federated RL Experiment')
+    parser.add_argument('--agg_method', type=str, default='krum', choices=['krum', 'median', 'trimmed_mean', 'fedavg'], help='Aggregation method')
+    parser.add_argument('--enable_attack', type=lambda x: (str(x).lower() == 'true'), default=True, help='Enable model poisoning attack')
+    parser.add_argument('--attack_method', type=str, default='random_noise', help='Attack method')
+    parser.add_argument('--attack_epsilon', type=float, default=10.0, help='Attack strength')
+    parser.add_argument('--use_robust_fl', type=lambda x: (str(x).lower() == 'true'), default=True, help='Use robust federated learning')
+    parser.add_argument('--num_adv', type=int, default=1, help='Number of adversarial clients')
+    parser.add_argument('--trim_ratio', type=float, default=0.1, help='Trim ratio for trimmed mean')
+    parser.add_argument('--use_migration_env', type=lambda x: (str(x).lower() == 'true'), default=False, help='Use microservice migration environment')
+    parser.add_argument('--num_edge_nodes', type=int, default=3, help='Number of edge nodes')
+    parser.add_argument('--num_mobile_devices', type=int, default=5, help='Number of mobile devices/clients')
+    parser.add_argument('--num_services', type=int, default=5, help='Number of microservices (for migration env)')
+    parser.add_argument('--episodes_per_round', type=int, default=100, help='Episodes per round')
+    parser.add_argument('--num_rounds', type=int, default=10, help='Number of federated learning rounds')
+    parser.add_argument('--output_dir', type=str, default='results', help='Directory to save output files')
+    args = parser.parse_args()
+
+    USE_ROBUST_FL = args.use_robust_fl
+    AGGREGATION_METHOD = args.agg_method
+    NUM_ADV = args.num_adv
+    TRIM_RATIO = args.trim_ratio
+    ENABLE_ATTACK = args.enable_attack
+    ATTACK_METHOD = args.attack_method
+    ATTACK_EPSILON = args.attack_epsilon
+    USE_MIGRATION_ENV = args.use_migration_env
+    NUM_EDGE_NODES = args.num_edge_nodes
+    NUM_MOBILE_DEVICES = args.num_mobile_devices
+    NUM_SERVICES = args.num_services
+    EPISODES_PER_ROUND = args.episodes_per_round
+    NUM_ROUNDS = args.num_rounds
+    OUTPUT_DIR = args.output_dir
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+    print(f'NUM_ROUNDS from args: {NUM_ROUNDS}')
 
     # Create environment
     if USE_MIGRATION_ENV:
@@ -174,7 +189,7 @@ def main():
     plt.title('Federated Reinforcement Learning Performance')
     plt.legend()
     plt.grid(True)
-    plt.savefig('training_results.png')
+    plt.savefig(os.path.join(OUTPUT_DIR, 'training_results.png'))
     plt.close()
     
     # 2. Plot Reward Distribution Histogram
@@ -184,7 +199,7 @@ def main():
     plt.ylabel('Frequency')
     plt.title('Distribution of Global Average Rewards')
     plt.grid(True, alpha=0.3)
-    plt.savefig('reward_distribution.png')
+    plt.savefig(os.path.join(OUTPUT_DIR, 'reward_distribution.png'))
     plt.close()
 
     # 3. Plot Client-wise Reward Comparison
@@ -196,7 +211,7 @@ def main():
     plt.title('Average Rewards per Client')
     plt.xticks(range(len(client_avg_rewards)))
     plt.grid(True, alpha=0.3)
-    plt.savefig('client_rewards.png')
+    plt.savefig(os.path.join(OUTPUT_DIR, 'client_rewards.png'))
     plt.close()
 
     # 4. Plot Service Location Heatmap (if using migration environment)
@@ -205,7 +220,9 @@ def main():
         service_locations = np.zeros((NUM_SERVICES, NUM_EDGE_NODES))
         for i, agent in enumerate(agents):
             state = env.reset()
-            service_locations += state[:NUM_SERVICES].reshape(NUM_SERVICES, NUM_EDGE_NODES)
+            # state: shape (NUM_SERVICES,), each value is the node index for that service
+            for sid, node in enumerate(state[:NUM_SERVICES]):
+                service_locations[sid, int(node)] += 1
         
         plt.figure(figsize=(10, 8))
         plt.imshow(service_locations, cmap='YlOrRd')
@@ -213,7 +230,7 @@ def main():
         plt.xlabel('Edge Node')
         plt.ylabel('Service ID')
         plt.title('Service Distribution Across Edge Nodes')
-        plt.savefig('service_distribution.png')
+        plt.savefig(os.path.join(OUTPUT_DIR, 'service_distribution.png'))
         plt.close()
 
     # 5. Plot Training Loss (if available)
@@ -226,7 +243,7 @@ def main():
         plt.title('Training Loss per Client')
         plt.legend()
         plt.grid(True)
-        plt.savefig('training_loss.png')
+        plt.savefig(os.path.join(OUTPUT_DIR, 'training_loss.png'))
         plt.close()
 
     # 6. Plot Attack Impact Analysis (if attack is enabled)
@@ -242,7 +259,7 @@ def main():
         plt.title('Impact of Model Poisoning Attacks on Training')
         plt.grid(True, alpha=0.3)
         plt.legend()
-        plt.savefig('attack_impact.png')
+        plt.savefig(os.path.join(OUTPUT_DIR, 'attack_impact.png'))
         plt.close()
 
         # Plot attack success rate
@@ -254,7 +271,7 @@ def main():
             plt.title('Model Poisoning Attack Success Rate')
             plt.grid(True, alpha=0.3)
             plt.legend()
-            plt.savefig('attack_success_rate.png')
+            plt.savefig(os.path.join(OUTPUT_DIR, 'attack_success_rate.png'))
             plt.close()
 
     # 7. Plot Aggregation Method Comparison
@@ -269,7 +286,7 @@ def main():
         plt.title('Robust vs Standard Aggregation Performance')
         plt.legend()
         plt.grid(True)
-        plt.savefig('aggregation_comparison.png')
+        plt.savefig(os.path.join(OUTPUT_DIR, 'aggregation_comparison.png'))
         plt.close()
 
     # 8. Plot Client Performance Evolution
@@ -281,23 +298,23 @@ def main():
     plt.title('Client Performance Evolution')
     plt.legend()
     plt.grid(True, alpha=0.3)
-    plt.savefig('client_evolution.png')
+    plt.savefig(os.path.join(OUTPUT_DIR, 'client_evolution.png'))
     plt.close()
 
     # Export Rewards to CSV
-    export_rewards_to_csv(global_rewards, filename='training_rewards.csv')
-    print("Training rewards exported to training_rewards.csv")
+    export_rewards_to_csv(global_rewards, filename=os.path.join(OUTPUT_DIR, 'training_rewards.csv'))
+    print(f"Training rewards exported to {os.path.join(OUTPUT_DIR, 'training_rewards.csv')}")
 
     # Plot Initial and Final DAG Service Locations (only if using migration env)
     if USE_MIGRATION_ENV:
          print("Visualizing initial DAG structure...")
          env_for_plotting = MicroserviceMigrationEnv(num_nodes=NUM_EDGE_NODES, num_services=NUM_SERVICES)
-         plot_dag_with_locations(initial_dag, env_for_plotting.reset()[:env_for_plotting.num_services], env_for_plotting.num_nodes, filename='initial_dag_locations.png')
-         print("Initial DAG visualization saved to initial_dag_locations.png")
+         plot_dag_with_locations(initial_dag, env_for_plotting.reset()[:env_for_plotting.num_services], env_for_plotting.num_nodes, filename=os.path.join(OUTPUT_DIR, 'initial_dag_locations.png'))
+         print(f"Initial DAG visualization saved to {os.path.join(OUTPUT_DIR, 'initial_dag_locations.png')}")
 
     # Save the final global model
-    torch.save(federated_learning.global_model.state_dict(), 'global_model.pth')
-    print("Final global model saved to global_model.pth")
+    torch.save(federated_learning.global_model.state_dict(), os.path.join(OUTPUT_DIR, 'global_model.pth'))
+    print(f"Final global model saved to {os.path.join(OUTPUT_DIR, 'global_model.pth')}")
 
     print("\nVisualization files generated:")
     print("1. training_results.png - Global average reward curve")
